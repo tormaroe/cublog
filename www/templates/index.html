@@ -1,0 +1,16 @@
+{{ extends "/layout.html" }}
+
+{{ define "content" }}
+
+<section class="section">
+    <div class="container">
+        {{ range .Posts }}
+           <h2 class="title is-5">
+               <a href="p/{{ .Path }}/">{{ .Title }}</a>
+            </h2>
+           <p>{{ .Body }}</p>
+        {{ end }}
+    </div>
+</section>
+
+{{ end }}
