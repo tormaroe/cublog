@@ -32,7 +32,8 @@ func findPost(path string) (*posts.BlogPost, error) {
 func pageHandler(ctx *golf.Context) {
 	post, err := findPost(ctx.Param("page"))
 	if err != nil {
-		ctx.Send(404)
+		ctx.Abort(404)
+		return
 	}
 
 	data := map[string]interface{}{
