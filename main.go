@@ -3,6 +3,7 @@ package main
 import (
 	"errors"
 	"fmt"
+	"html/template"
 	"os"
 
 	"github.com/dinever/golf"
@@ -156,7 +157,7 @@ func updatePostHandler(ctx *golf.Context) {
 	}
 	post.Title = ctx.Request.FormValue("PostTitle")
 	post.Path = ctx.Request.FormValue("PostSlug")
-	post.Body = ctx.Request.FormValue("PostBody")
+	post.Body = template.HTML(ctx.Request.FormValue("PostBody"))
 	post.Approved = false
 	if err = post.Save(); err != nil {
 		panic(err)

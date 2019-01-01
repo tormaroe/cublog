@@ -2,6 +2,7 @@ package posts
 
 import (
 	"encoding/json"
+	"html/template"
 	"io/ioutil"
 	"time"
 )
@@ -13,14 +14,14 @@ type BlogPost struct {
 	Approved      bool
 	Published     bool
 	PublishedDate time.Time
-	Body          string
+	Body          template.HTML
 }
 
 // New creates a new BlogPost
 func New(title string, path string, body string) *BlogPost {
 	return &BlogPost{Title: title,
 		Path:      path,
-		Body:      body,
+		Body:      template.HTML(body),
 		Approved:  false,
 		Published: false}
 }
