@@ -1,0 +1,36 @@
+{{ extends "/layout.html" }}
+
+{{ define "content" }}
+
+<section class="section">
+    <div class="container">
+        <div class="buttons">
+            <a href="admin/new" class="button is-primary is-rounded">New blog post</a>
+        </div>
+        <table class="table">
+            <thead>
+                <tr>
+                    <th>Title</th>
+                    <th>Approved</th>
+                    <th>Published</th>
+                    <th>Published date</th>
+                    <th>&nbsp;</th>
+                </tr>
+            </thead>
+            <tbody>
+                {{ range .Posts }}
+                <tr>
+                    <td>{{ .Title }}</td>
+                    <td>{{ .Approved }}</td>
+                    <td>{{ .Published }}</td>
+                    <td>{{ .PublishedDate }}</td>
+                    <td><a href="admin/{{ .Path }}/edit">Edit</a></td>
+                </tr>
+                {{ end }}
+            </tbody>
+        </table>
+        
+    </div>
+</section>
+
+{{ end }}

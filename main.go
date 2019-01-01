@@ -43,6 +43,80 @@ func pageHandler(ctx *golf.Context) {
 	ctx.Loader("template").Render("post.html", data)
 }
 
+func adminHandler(ctx *golf.Context) {
+	data := map[string]interface{}{
+		"Title": "Admin",
+		"Posts": allPosts,
+	}
+	ctx.Loader("template").Render("admin.html", data)
+}
+
+func newPostHandler(ctx *golf.Context) {
+	data := map[string]interface{}{
+		"Title": "New post",
+	}
+	ctx.Loader("template").Render("post-form.html", data)
+}
+
+func insertPostHandler(ctx *golf.Context) {
+	err := ctx.Request.ParseForm()
+	if err != nil {
+		panic(err)
+	}
+	post := posts.New(ctx.Request.FormValue("PostTitle"), ctx.Request.FormValue("PostSlug"), ctx.Request.FormValue("PostBody"))
+	if err = post.Save(); err != nil {
+		panic(err)
+	}
+	allPosts = append(allPosts, post)
+	ctx.Redirect("/admin")
+}
+
+func editPostHandler(ctx *golf.Context) {
+	post, err := findPost(ctx.Param("page"))
+	if err != nil {
+		ctx.Abort(404)
+		return
+	}
+
+	data := map[string]interface{}{
+		"Title": "Edit: " + post.Title,
+		"Post":  post,
+	}
+	ctx.Loader("template").Render("post-form.html", data)
+}
+
+func updatePostHandler(ctx *golf.Context) {
+	err := ctx.Request.ParseForm()
+	if err != nil {
+		panic(err)
+	}
+	post, err := findPost(ctx.Param("page"))
+	if err != nil {
+		ctx.Abort(404)
+		return
+	}
+	post.Title = ctx.Request.FormValue("PostTitle")
+	post.Path = ctx.Request.FormValue("PostSlug")
+	post.Body = ctx.Request.FormValue("PostBody")
+	post.Approved = false
+	if err = post.Save(); err != nil {
+		panic(err)
+	}
+	ctx.Redirect("/admin")
+}
+
+func approvePostHandler(ctx *golf.Context) {
+	ctx.Send("TODO")
+}
+
+func publishPostHandler(ctx *golf.Context) {
+	ctx.Send("TODO")
+}
+
+func deletePostHandler(ctx *golf.Context) {
+	ctx.Send("TODO")
+}
+
 func main() {
 	file, err := os.Open("config.json")
 	if err != nil {
@@ -60,8 +134,22 @@ func main() {
 	app := golf.New()
 	app.Config, err = golf.ConfigFromJSON(file)
 	app.View.SetTemplateLoader("template", "www/templates/")
+
 	app.Static("/www/static/", "static")
+
 	app.Get("/", mainHandler)
 	app.Get("/p/:page/", pageHandler)
-	app.Run(":9000")
+
+	app.Get("/admin", adminHandler)
+
+	app.Get("/admin/new", newPostHandler)
+	app.Post("/admin/new", insertPostHandler)
+	app.Get("/admin/:page/edit", editPostHandler)
+	app.Post("/admin/:page/edit", updatePostHandler)
+
+	app.Put("/admin/:page/approve", approvePostHandler)
+	app.Put("/admin/:page/publish", publishPostHandler)
+	app.Delete("/admin/:page", deletePostHandler)
+
+	app.Run(":45001")
 }
