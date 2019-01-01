@@ -43,6 +43,65 @@ func pageHandler(ctx *golf.Context) {
 	ctx.Loader("template").Render("post.html", data)
 }
 
+func requireAuthentication(next golf.HandlerFunc) golf.HandlerFunc {
+	fn := func(ctx *golf.Context) {
+		if loggedIn, err := ctx.Session.Get("loggedIn"); err == nil && loggedIn.(bool) {
+			next(ctx)
+		} else {
+			ctx.Redirect("/login")
+		}
+	}
+	return fn
+}
+
+func requireParent(next golf.HandlerFunc) golf.HandlerFunc {
+	fn := func(ctx *golf.Context) {
+		if loggedIn, err := ctx.Session.Get("loggedIn"); err == nil && loggedIn.(bool) {
+			next(ctx)
+		} else {
+			ctx.Redirect("/login")
+		}
+	}
+	return fn
+}
+
+func loginHandler(ctx *golf.Context) {
+	ctx.Loader("template").Render("login.html", make(map[string]interface{}))
+}
+
+func loginHandlerPost(ctx *golf.Context) {
+	user := ctx.Request.FormValue("user")
+	password := ctx.Request.FormValue("password")
+	fmt.Println("Login request by " + user)
+
+	parentPassword, _ := ctx.App.Config.GetString("parentPassword", "øæoai3wryfuoøi<es")
+	childPassword, _ := ctx.App.Config.GetString("childPassword", "poaøirefghuaoiuhf")
+
+	if password == parentPassword {
+		ctx.Session.Set("loggedIn", true)
+		ctx.Session.Set("user", user)
+		ctx.Session.Set("parent", true)
+	} else if password == childPassword {
+		ctx.Session.Set("loggedIn", true)
+		ctx.Session.Set("user", user)
+		ctx.Session.Set("parent", false)
+	} else {
+		ctx.Loader("template").Render("login.html", map[string]interface{}{
+			"Message":    "Username or password was wrong, please try again!",
+			"HasMessage": true,
+		})
+	}
+
+	ctx.Redirect("/admin")
+}
+
+func logoutHandler(ctx *golf.Context) {
+	ctx.Session.Delete("loggedIn")
+	ctx.Session.Delete("user")
+	ctx.Session.Delete("parent")
+	ctx.Redirect("/")
+}
+
 func adminHandler(ctx *golf.Context) {
 	data := map[string]interface{}{
 		"Title": "Admin",
@@ -135,21 +194,32 @@ func main() {
 	app.Config, err = golf.ConfigFromJSON(file)
 	app.View.SetTemplateLoader("template", "www/templates/")
 
+	app.SessionManager = golf.NewMemorySessionManager()
+	app.Use(golf.SessionMiddleware)
+
 	app.Static("/www/static/", "static")
 
 	app.Get("/", mainHandler)
 	app.Get("/p/:page/", pageHandler)
 
-	app.Get("/admin", adminHandler)
+	app.Get("/login", loginHandler)
+	app.Post("/login", loginHandlerPost)
+	app.Get("/logout", logoutHandler)
 
-	app.Get("/admin/new", newPostHandler)
-	app.Post("/admin/new", insertPostHandler)
-	app.Get("/admin/:page/edit", editPostHandler)
-	app.Post("/admin/:page/edit", updatePostHandler)
+	authChain := golf.NewChain(requireAuthentication)
+	parentChain := golf.NewChain(requireAuthentication)
+	parentChain.Append(requireParent)
 
-	app.Put("/admin/:page/approve", approvePostHandler)
-	app.Put("/admin/:page/publish", publishPostHandler)
-	app.Delete("/admin/:page", deletePostHandler)
+	app.Get("/admin", authChain.Final(adminHandler))
 
-	app.Run(":45001")
+	app.Get("/admin/new", authChain.Final(newPostHandler))
+	app.Post("/admin/new", authChain.Final(insertPostHandler))
+	app.Get("/admin/:page/edit", authChain.Final(editPostHandler))
+	app.Post("/admin/:page/edit", authChain.Final(updatePostHandler))
+
+	app.Put("/admin/:page/approve", parentChain.Final(approvePostHandler))
+	app.Put("/admin/:page/publish", authChain.Final(publishPostHandler))
+	app.Delete("/admin/:page", authChain.Final(deletePostHandler))
+
+	app.Run(":9000")
 }

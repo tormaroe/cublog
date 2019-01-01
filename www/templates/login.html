@@ -1,0 +1,36 @@
+{{ extends "/layout.html" }}
+
+{{ define "content" }}
+
+<section class="section">
+    <div class="container">
+        <form method="POST">
+            
+            {{ if .HasMessage }}
+            <div class="notification is-danger">
+                {{ .Message }}
+            </div>            
+            {{ end }}
+            
+            <div class="field">
+                <label class="label">User</label>
+                <div class="control">
+                    <input name="user" class="input" type="text" placeholder="">
+                </div>
+            </div>
+            <div class="field">
+                <label class="label">Password</label>
+                <div class="control">
+                    <input name="password" class="input" type="password" placeholder="">
+                </div>
+            </div>
+            <div class="field is-grouped">
+                <div class="control">
+                    <button class="button is-link" type="submit">Login</button>
+                </div>
+            </div>
+        </form>
+    </div>
+</section>
+
+{{ end }}
