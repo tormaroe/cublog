@@ -11,19 +11,24 @@ import (
 type BlogPost struct {
 	Path          string
 	Title         string
+	Deleted       bool
 	Approved      bool
 	Published     bool
 	PublishedDate time.Time
+	CreatedDate   time.Time
 	Body          template.HTML
 }
 
 // New creates a new BlogPost
 func New(title string, path string, body string) *BlogPost {
 	return &BlogPost{Title: title,
-		Path:      path,
-		Body:      template.HTML(body),
-		Approved:  false,
-		Published: false}
+		Path:        path,
+		Body:        template.HTML(body),
+		Approved:    false,
+		Deleted:     false,
+		Published:   false,
+		CreatedDate: time.Now(),
+	}
 }
 
 // Save BlogPost to it's Path as json

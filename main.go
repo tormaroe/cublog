@@ -1,7 +1,6 @@
 package main
 
 import (
-	"errors"
 	"fmt"
 	"html/template"
 	"os"
@@ -10,28 +9,19 @@ import (
 	"github.com/tormaroe/cublog/posts"
 )
 
-var allPosts = []*posts.BlogPost{}
+var blogState = posts.NewBlogState()
 
 func mainHandler(ctx *golf.Context) {
 	title, _ := ctx.App.Config.GetString("blogName", "The Blog")
 	data := map[string]interface{}{
 		"Title": title,
-		"Posts": allPosts,
+		"Posts": blogState.MainPagePosts(),
 	}
 	ctx.Loader("template").Render("index.html", data)
 }
 
-func findPost(path string) (*posts.BlogPost, error) {
-	for i := range allPosts {
-		if allPosts[i].Path == path {
-			return allPosts[i], nil
-		}
-	}
-	return nil, errors.New("Post not found")
-}
-
 func pageHandler(ctx *golf.Context) {
-	post, err := findPost(ctx.Param("page"))
+	post, err := blogState.FindPost(ctx.Param("page"))
 	if err != nil {
 		ctx.Abort(404)
 		return
@@ -106,7 +96,7 @@ func logoutHandler(ctx *golf.Context) {
 func adminHandler(ctx *golf.Context) {
 	data := map[string]interface{}{
 		"Title": "Admin",
-		"Posts": allPosts,
+		"Posts": blogState.AdminPagePosts(),
 	}
 	ctx.Loader("template").Render("admin.html", data)
 }
@@ -119,20 +109,21 @@ func newPostHandler(ctx *golf.Context) {
 }
 
 func insertPostHandler(ctx *golf.Context) {
-	err := ctx.Request.ParseForm()
+	err := ctx.Request.ParseForm() // Not needed?!
 	if err != nil {
 		panic(err)
 	}
 	post := posts.New(ctx.Request.FormValue("PostTitle"), ctx.Request.FormValue("PostSlug"), ctx.Request.FormValue("PostBody"))
-	if err = post.Save(); err != nil {
+	err = blogState.AddAndSave(post)
+	if err != nil {
 		panic(err)
 	}
-	allPosts = append(allPosts, post)
+
 	ctx.Redirect("/admin")
 }
 
 func editPostHandler(ctx *golf.Context) {
-	post, err := findPost(ctx.Param("page"))
+	post, err := blogState.FindPost(ctx.Param("page"))
 	if err != nil {
 		ctx.Abort(404)
 		return
@@ -150,7 +141,7 @@ func updatePostHandler(ctx *golf.Context) {
 	if err != nil {
 		panic(err)
 	}
-	post, err := findPost(ctx.Param("page"))
+	post, err := blogState.FindPost(ctx.Param("page"))
 	if err != nil {
 		ctx.Abort(404)
 		return
@@ -183,12 +174,8 @@ func main() {
 		panic(err)
 	}
 
-	allPosts, err = posts.LoadAll()
-	if err != nil {
+	if err = blogState.Load(); err != nil {
 		panic(err)
-	}
-	for _, p := range allPosts {
-		fmt.Println("Loaded post: " + p.Title)
 	}
 
 	app := golf.New()
