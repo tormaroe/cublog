@@ -30,8 +30,18 @@
             
             <div class="field is-grouped">
                 <div class="control">
-                    <button type="submit" class="button is-link">Save</button>
+                    <button type="submit" class="button is-primary">Save</button>
                 </div>
+                {{ if .IsParent }}
+                <div class="control">
+                    <button class="button is-success" type="button" onclick="approvePost()">Approve</button>
+                </div>
+                {{ end }}
+                {{ if .Post.Approved }}
+                <div class="control">
+                    <button class="button is-danger" type="button" onclick="publishPost()">Publish</button>
+                </div>
+                {{ end }}
                 <div class="control">
                     <a class="button is-text" href="/admin">Cancel</a>
                 </div>
@@ -58,6 +68,20 @@
         var hiddenPostBody = document.querySelector('input[name=PostBody]');
         hiddenPostBody.value = quill.root.innerHTML;
         return true;
+    }
+
+    var approvePost = function (e) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("PUT", "/admin/{{ .Post.Path }}/approve", false)
+        xhttp.send()
+        window.location.href = "/admin"
+    }
+
+    var publishPost = function (e) {
+        var xhttp = new XMLHttpRequest();
+        xhttp.open("PUT", "/admin/{{ .Post.Path }}/publish", false)
+        xhttp.send()
+        window.location.href = "/p/{{ .Post.Path }}"
     }
 </script>
 {{ end }}

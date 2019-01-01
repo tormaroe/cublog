@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"html/template"
 	"os"
+	"time"
 
 	"github.com/dinever/golf"
 	"github.com/tormaroe/cublog/posts"
@@ -11,12 +12,18 @@ import (
 
 var blogState = posts.NewBlogState()
 
+func defaultTemplateData(ctx *golf.Context, title string) map[string]interface{} {
+	return map[string]interface{}{
+		"Title":      title,
+		"IsLoggedIn": isLoggedIn(ctx),
+		"IsParent":   isParent(ctx),
+	}
+}
+
 func mainHandler(ctx *golf.Context) {
 	title, _ := ctx.App.Config.GetString("blogName", "The Blog")
-	data := map[string]interface{}{
-		"Title": title,
-		"Posts": blogState.MainPagePosts(),
-	}
+	data := defaultTemplateData(ctx, title)
+	data["Posts"] = blogState.MainPagePosts()
 	ctx.Loader("template").Render("index.html", data)
 }
 
@@ -26,17 +33,24 @@ func pageHandler(ctx *golf.Context) {
 		ctx.Abort(404)
 		return
 	}
-
-	data := map[string]interface{}{
-		"Title": post.Title,
-		"Body":  post.Body,
-	}
+	data := defaultTemplateData(ctx, post.Title)
+	data["Body"] = post.Body
 	ctx.Loader("template").Render("post.html", data)
+}
+
+func isLoggedIn(ctx *golf.Context) bool {
+	loggedIn, err := ctx.Session.Get("loggedIn")
+	return err == nil && loggedIn.(bool)
+}
+
+func isParent(ctx *golf.Context) bool {
+	parent, err := ctx.Session.Get("parent")
+	return isLoggedIn(ctx) && err == nil && parent.(bool)
 }
 
 func requireAuthentication(next golf.HandlerFunc) golf.HandlerFunc {
 	fn := func(ctx *golf.Context) {
-		if loggedIn, err := ctx.Session.Get("loggedIn"); err == nil && loggedIn.(bool) {
+		if isLoggedIn(ctx) {
 			next(ctx)
 		} else {
 			ctx.Redirect("/login")
@@ -47,7 +61,7 @@ func requireAuthentication(next golf.HandlerFunc) golf.HandlerFunc {
 
 func requireParent(next golf.HandlerFunc) golf.HandlerFunc {
 	fn := func(ctx *golf.Context) {
-		if loggedIn, err := ctx.Session.Get("loggedIn"); err == nil && loggedIn.(bool) {
+		if isParent(ctx) {
 			next(ctx)
 		} else {
 			ctx.Redirect("/login")
@@ -57,7 +71,7 @@ func requireParent(next golf.HandlerFunc) golf.HandlerFunc {
 }
 
 func loginHandler(ctx *golf.Context) {
-	ctx.Loader("template").Render("login.html", make(map[string]interface{}))
+	ctx.Loader("template").Render("login.html", defaultTemplateData(ctx, "Login"))
 }
 
 func loginHandlerPost(ctx *golf.Context) {
@@ -94,18 +108,13 @@ func logoutHandler(ctx *golf.Context) {
 }
 
 func adminHandler(ctx *golf.Context) {
-	data := map[string]interface{}{
-		"Title": "Admin",
-		"Posts": blogState.AdminPagePosts(),
-	}
+	data := defaultTemplateData(ctx, "Admin")
+	data["Posts"] = blogState.AdminPagePosts()
 	ctx.Loader("template").Render("admin.html", data)
 }
 
 func newPostHandler(ctx *golf.Context) {
-	data := map[string]interface{}{
-		"Title": "New post",
-	}
-	ctx.Loader("template").Render("post-form.html", data)
+	ctx.Loader("template").Render("post-form.html", defaultTemplateData(ctx, "New post"))
 }
 
 func insertPostHandler(ctx *golf.Context) {
@@ -129,10 +138,8 @@ func editPostHandler(ctx *golf.Context) {
 		return
 	}
 
-	data := map[string]interface{}{
-		"Title": "Edit: " + post.Title,
-		"Post":  post,
-	}
+	data := defaultTemplateData(ctx, "Edit: "+post.Title)
+	data["Post"] = post
 	ctx.Loader("template").Render("post-form.html", data)
 }
 
@@ -143,7 +150,7 @@ func updatePostHandler(ctx *golf.Context) {
 	}
 	post, err := blogState.FindPost(ctx.Param("page"))
 	if err != nil {
-		ctx.Abort(404)
+		ctx.SendStatus(404)
 		return
 	}
 	post.Title = ctx.Request.FormValue("PostTitle")
@@ -157,15 +164,38 @@ func updatePostHandler(ctx *golf.Context) {
 }
 
 func approvePostHandler(ctx *golf.Context) {
-	ctx.Send("TODO")
+	post, err := blogState.FindPost(ctx.Param("page"))
+	if err != nil {
+		ctx.SendStatus(404)
+		return
+	}
+	post.Approved = true
+	post.Save()
+	ctx.SendStatus(200)
 }
 
 func publishPostHandler(ctx *golf.Context) {
-	ctx.Send("TODO")
+	post, err := blogState.FindPost(ctx.Param("page"))
+	if err != nil {
+		ctx.SendStatus(404)
+		return
+	}
+	post.Published = true
+	post.PublishedDate = time.Now()
+	post.Save()
+	ctx.SendStatus(200)
 }
 
 func deletePostHandler(ctx *golf.Context) {
-	ctx.Send("TODO")
+
+	post, err := blogState.FindPost(ctx.Param("page"))
+	if err != nil {
+		ctx.SendStatus(404)
+		return
+	}
+	post.Deleted = true
+	post.Save()
+	ctx.SendStatus(200)
 }
 
 func main() {
