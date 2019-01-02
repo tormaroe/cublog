@@ -1,10 +1,11 @@
 package main
 
 import (
-	"fmt"
 	"html/template"
 	"os"
 	"time"
+
+	"github.com/tormaroe/cublog/auth"
 
 	"github.com/dinever/golf"
 	"github.com/tormaroe/cublog/posts"
@@ -15,8 +16,8 @@ var blogState = posts.NewBlogState()
 func defaultTemplateData(ctx *golf.Context, title string) map[string]interface{} {
 	return map[string]interface{}{
 		"Title":      title,
-		"IsLoggedIn": isLoggedIn(ctx),
-		"IsParent":   isParent(ctx),
+		"IsLoggedIn": auth.IsLoggedIn(ctx),
+		"IsParent":   auth.IsParent(ctx),
 	}
 }
 
@@ -36,75 +37,6 @@ func pageHandler(ctx *golf.Context) {
 	data := defaultTemplateData(ctx, post.Title)
 	data["Body"] = post.Body
 	ctx.Loader("template").Render("post.html", data)
-}
-
-func isLoggedIn(ctx *golf.Context) bool {
-	loggedIn, err := ctx.Session.Get("loggedIn")
-	return err == nil && loggedIn.(bool)
-}
-
-func isParent(ctx *golf.Context) bool {
-	parent, err := ctx.Session.Get("parent")
-	return isLoggedIn(ctx) && err == nil && parent.(bool)
-}
-
-func requireAuthentication(next golf.HandlerFunc) golf.HandlerFunc {
-	fn := func(ctx *golf.Context) {
-		if isLoggedIn(ctx) {
-			next(ctx)
-		} else {
-			ctx.Redirect("/login")
-		}
-	}
-	return fn
-}
-
-func requireParent(next golf.HandlerFunc) golf.HandlerFunc {
-	fn := func(ctx *golf.Context) {
-		if isParent(ctx) {
-			next(ctx)
-		} else {
-			ctx.Redirect("/login")
-		}
-	}
-	return fn
-}
-
-func loginHandler(ctx *golf.Context) {
-	ctx.Loader("template").Render("login.html", defaultTemplateData(ctx, "Login"))
-}
-
-func loginHandlerPost(ctx *golf.Context) {
-	user := ctx.Request.FormValue("user")
-	password := ctx.Request.FormValue("password")
-	fmt.Println("Login request by " + user)
-
-	parentPassword, _ := ctx.App.Config.GetString("parentPassword", "øæoai3wryfuoøi<es")
-	childPassword, _ := ctx.App.Config.GetString("childPassword", "poaøirefghuaoiuhf")
-
-	if password == parentPassword {
-		ctx.Session.Set("loggedIn", true)
-		ctx.Session.Set("user", user)
-		ctx.Session.Set("parent", true)
-	} else if password == childPassword {
-		ctx.Session.Set("loggedIn", true)
-		ctx.Session.Set("user", user)
-		ctx.Session.Set("parent", false)
-	} else {
-		ctx.Loader("template").Render("login.html", map[string]interface{}{
-			"Message":    "Username or password was wrong, please try again!",
-			"HasMessage": true,
-		})
-	}
-
-	ctx.Redirect("/admin")
-}
-
-func logoutHandler(ctx *golf.Context) {
-	ctx.Session.Delete("loggedIn")
-	ctx.Session.Delete("user")
-	ctx.Session.Delete("parent")
-	ctx.Redirect("/")
 }
 
 func adminHandler(ctx *golf.Context) {
@@ -210,6 +142,12 @@ func main() {
 
 	app := golf.New()
 	app.Config, err = golf.ConfigFromJSON(file)
+
+	admins, err := auth.LoadAdminsFromFile("admins.json")
+	if err != nil {
+		panic(err)
+	}
+
 	app.View.SetTemplateLoader("template", "www/templates/")
 
 	app.SessionManager = golf.NewMemorySessionManager()
@@ -220,13 +158,13 @@ func main() {
 	app.Get("/", mainHandler)
 	app.Get("/p/:page/", pageHandler)
 
-	app.Get("/login", loginHandler)
-	app.Post("/login", loginHandlerPost)
-	app.Get("/logout", logoutHandler)
+	app.Get("/login", auth.LoginHandler)
+	app.Post("/login", auth.LoginHandlerPost(admins))
+	app.Get("/logout", auth.LogoutHandler)
 
-	authChain := golf.NewChain(requireAuthentication)
-	parentChain := golf.NewChain(requireAuthentication)
-	parentChain.Append(requireParent)
+	authChain := golf.NewChain(auth.RequireAuthentication)
+	parentChain := golf.NewChain(auth.RequireAuthentication)
+	parentChain.Append(auth.RequireParent)
 
 	app.Get("/admin", authChain.Final(adminHandler))
 

@@ -1,0 +1,12 @@
+[
+    {
+        "Username": "child",
+        "Password": "simple",
+        "IsParent": false
+    },
+    {
+        "Username": "parent",
+        "Password": "hard",
+        "IsParent": true
+    }
+]
